@@ -14,21 +14,67 @@ import shutil
 import sys
 import tempfile
 import zipfile
+from importlib import resources
 from pathlib import Path
 
-GENERIC_NETSEC = b"""<?xml version="1.0" encoding="utf-8"?>
-<network-security-config>
-    <base-config cleartextTrafficPermitted="true">
-        <trust-anchors>
-            <certificates src="system"/>
-            <certificates src="user"/>
-        </trust-anchors>
-    </base-config>
-</network-security-config>
-"""
+BINARY_NETSEC_FILENAME = "network_security_config.xml"
+PLAINTEXT_NETSEC_FILENAME = "network_security_config_plain.xml"
+# file(1) magic signature (lelong 0x00080003):
+# - RES_XML_TYPE (0x0003)
+# - ResXMLTree_header headerSize (0x0008)
+# Reference (file(1) magic rule for Android binary XML):
+# https://github.com/file/file/blob/44cfb238c42f6ccaa9440c523dccdc7b72179911/magic/Magdir/android#L179-L185
+AXML_FILE_MAGIC_BYTES = b"\x03\x00\x08\x00"
 
 
-def guess_netsec_path(apk_path):
+def _load_bundled_bytes(filename):
+    """Load a bundled file as bytes via importlib.resources with local fallback."""
+    try:
+        return resources.files(__package__ or __name__).joinpath(filename).read_bytes()
+    except Exception:
+        path = Path(__file__).with_name(filename)
+        if not path.is_file():
+            raise RuntimeError(f"Bundled config file missing: {path}")
+        return path.read_bytes()
+
+
+def _is_binary_axml(data):
+    """Heuristic check to determine if the given data is likely a binary AXML file."""
+    # Matches file(1) rule: 0 lelong 0x00080003 Android binary XML.
+    return data.startswith(AXML_FILE_MAGIC_BYTES)
+
+
+def _is_plaintext_xml(data):
+    """Heuristic check to determine if the given data is plain-text XML."""
+    if not data:
+        return False
+
+    for encoding in ("utf-8-sig", "utf-16", "utf-16le", "utf-16be"):
+        try:
+            text = data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+
+        if text.lstrip().startswith("<"):
+            return True
+    return False
+
+
+def pick_replacement_bytes(target_data):
+    if _is_binary_axml(target_data):
+        print("[+] Target format detected: binary AXML")
+        return _load_bundled_bytes(BINARY_NETSEC_FILENAME)
+
+    if _is_plaintext_xml(target_data):
+        print("[+] Target format detected: plain-text XML")
+        return _load_bundled_bytes(PLAINTEXT_NETSEC_FILENAME)
+
+    raise RuntimeError(
+        "Target XML format is neither Android binary AXML nor plain-text XML"
+    )
+
+
+def _detect_netsec_path(apk_path):
     # Strings can appear in plain XML or inside binary AXML string pools.
     markers = [
         b"network-security-config",
@@ -74,14 +120,13 @@ def find_netsec_path(apk_path, xml_path=None):
     if xml_path:
         return xml_path
 
-    guessed = guess_netsec_path(apk_path)
-    if guessed:
-        print(f"[+] Guessed networkSecurityConfig path -> {guessed}")
-        return guessed
+    detected = _detect_netsec_path(apk_path)
+    if detected:
+        print(f"[+] Detected networkSecurityConfig path -> {detected}")
+        return detected
 
     raise RuntimeError(
-        "Could not determine XML path automatically. "
-        "Provide --xml-path explicitly."
+        "Could not determine XML path automatically. " "Provide --xml-path explicitly."
     )
 
 
@@ -104,11 +149,12 @@ def patch_apk(apk_path, xml_path=None):
                 replaced = False
 
                 for item in zin.infolist():
-                    data = zin.read(item.filename)
+                    orig_data = zin.read(item.filename)
+                    data = orig_data
 
                     if item.filename == xml_path:
                         print(f"[+] Replacing {xml_path}")
-                        data = GENERIC_NETSEC
+                        data = pick_replacement_bytes(orig_data)
                         replaced = True
 
                     zout.writestr(item, data)

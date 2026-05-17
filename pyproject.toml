@@ -18,8 +18,11 @@ readme = "README.md"
 requires-python = ">=3.9"
 version = "0.1.0"
 
-[project.optional-dependencies]
-auto = ["androguard>=4.1.3"]
-
 [project.scripts]
 patch-netsec-conf = "patch_netsec_conf:main"
+
+[tool.setuptools]
+py-modules = ["patch_netsec_conf"]
+
+[tool.setuptools.data-files]
+"." = ["network_security_config.xml", "network_security_config_plain.xml"]
