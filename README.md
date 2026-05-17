@@ -9,6 +9,13 @@ This utility locates the app's `networkSecurityConfig` XML by scanning APK resou
 
 This is useful when you need to intercept an app's network traffic for analysis and the app restricts trust to a custom set of CAs or disallows cleartext.
 
+## Why this instead of apktool (--net-sec-conf)?
+
+- Works on both Linux and Windows hosts (Python 3.9+).
+- Does not decompile all resources or run a full decode/rebuild cycle.
+- Patches only the target `networkSecurityConfig` XML entry inside the APK archive, then writes a patched APK copy.
+- Reduces build-time overhead and avoids common rebuild issues unrelated to network security config changes.
+
 ## Usage
 
 1. Install the tool with `uv` or run it directly.
