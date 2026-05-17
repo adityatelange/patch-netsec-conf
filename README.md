@@ -14,14 +14,15 @@ This is useful when you need to intercept an app's network traffic for analysis 
 1. Install the tool with `uv` or run it directly.
 
 ```sh
-uv install .
+uv tool install .
 patch-netsec-conf myapp.apk
 ```
 
-Or run directly:
+Or install using pip:
 
 ```sh
-python3 patch_netsec_conf.py myapp.apk
+pip install .
+patch-netsec-conf myapp.apk
 ```
 
 This produces a new file next to the input:
@@ -36,7 +37,12 @@ This produces a new file next to the input:
 ## How it works
 
 - Scans XML file contents for `network-security-config` markers (works even when filenames are obfuscated and files are binary AXML).
-- Replaces the target XML with a generic permissive network security config.
+- Detects the target XML entry format explicitly:
+  - Binary AXML if the file starts with Android binary XML magic bytes (`0x00080003`, little-endian).
+  - Plain-text XML only if content decodes as XML text (UTF-8/UTF-16) and starts with `<` after trimming.
+- Replaces binary targets with the bundled pre-generated binary AXML config from `network_security_config.xml`.
+- Replaces plain-text targets with the bundled plain-text permissive config from `network_security_config_plain.xml`.
+- Fails with an error if the target entry is neither recognized binary AXML nor plain-text XML (no implicit fallback).
 
 ## Options
 
