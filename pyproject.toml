@@ -19,10 +19,14 @@ requires-python = ">=3.9"
 version = "0.1.0"
 
 [project.scripts]
-patch-netsec-conf = "patch_netsec_conf:main"
+patch-netsec-conf = "patch_netsec_conf.patch_netsec_conf:main"
 
 [tool.setuptools]
-py-modules = ["patch_netsec_conf"]
+include-package-data = true
+packages = ["patch_netsec_conf"]
 
-[tool.setuptools.data-files]
-"." = ["network_security_config.xml", "network_security_config_plain.xml"]
+[tool.setuptools.package-dir]
+patch_netsec_conf = "patch-netsec-conf"
+
+[tool.setuptools.package-data]
+patch_netsec_conf = ["network_security_config.xml", "network_security_config_plain.xml"]

@@ -5,7 +5,8 @@ Patch an APK's network security config to allow user/system certs and cleartext.
 GitHub: https://github.com/adityatelange/patch-netsec-conf
 
 Usage:
-    python patch_netsec_conf.py <input.apk>
+    patch-netsec-conf <input.apk>
+    python -m patch_netsec_conf <input.apk>
 
 """
 

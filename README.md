@@ -47,8 +47,8 @@ This produces a new file next to the input:
 ## Options
 
 ```sh
-$ python3 patch_netsec_conf.py -h
-usage: patch_netsec_conf.py [-h] [--xml-path XML_PATH] apk_path
+$ patch-netsec-conf -h
+usage: patch-netsec-conf [-h] [--xml-path XML_PATH] apk_path
 
 Patch an APK's network security config to allow user/system certs and cleartext
 
