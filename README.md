@@ -1,6 +1,6 @@
 # patch-netsec-conf
 
-Patch an APK's Android Network Security Configuration to allow user/system certificates and cleartext.
+Patch an APK's Network Security Configuration to allow user/system certificates and cleartext traffic, without a full resource rebuild.
 
 This utility locates the app's `networkSecurityConfig` XML by scanning APK resource entries and replaces it with a permissive configuration that:
 
@@ -20,26 +20,25 @@ This is useful when you need to intercept an app's network traffic for analysis 
 
 1. Install the tool with `uv` or run it directly.
 
-```sh
-uv tool install .
-patch-netsec-conf myapp.apk
-```
+   ```sh
+   uv tool install .
+   patch-netsec-conf myapp.apk
+   ```
 
-Or install using pip:
+   Or install using pip:
 
-```sh
-pip install .
-patch-netsec-conf myapp.apk
-```
+   ```sh
+   pip install .
+   patch-netsec-conf myapp.apk
+   ```
 
-This produces a new file next to the input:
-
-- `myapp_nons.apk`
+   This produces a new file next to the input:
+   - `myapp_nons.apk`
 
 2. Sign the patched APK using your preferred signing tool.
 
-> Any APK modification invalidates the original signature. You must re-sign before installing.
-> I recommend using [APK Explorer & Editor (AEE)](https://github.com/apk-editor/APK-Explorer-Editor) for this step.
+   > Any APK modification invalidates the original signature. You must re-sign before installing.
+   > I recommend using [APK Explorer & Editor (AEE)](https://github.com/apk-editor/APK-Explorer-Editor) for this step.
 
 ## How it works
 
