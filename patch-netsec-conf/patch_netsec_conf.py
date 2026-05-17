@@ -172,7 +172,7 @@ def patch_apk(apk_path, xml_path=None):
 
 def print_banner():
     print(
-        "patch-netsec-conf - Patch APK network security config to allow user/system certs and cleartext"
+        "patch-netsec-conf - Patch an APK's Network Security Configuration to allow user/system certificates and cleartext traffic"
     )
     print("GitHub: https://github.com/adityatelange/patch-netsec-conf")
     print()
