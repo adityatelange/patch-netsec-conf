@@ -21,19 +21,19 @@ This is useful when you need to intercept an app's network traffic for analysis 
 1. Install the tool with `uv` or run it directly.
 
    ```sh
-   uv tool install .
-   patch-netsec-conf myapp.apk
+   uv tool install git+https://github.com/adityatelange/patch-netsec-conf
+   patch-netsec-conf com.app.apk
    ```
 
-   Or install using pip:
+   Or run directly after git cloning:
 
    ```sh
    pip install .
-   patch-netsec-conf myapp.apk
+   patch-netsec-conf com.app.apk
    ```
 
    This produces a new file next to the input:
-   - `myapp_nons.apk`
+   - `com.app_nons.apk`
 
 2. Sign the patched APK using your preferred signing tool.
 
