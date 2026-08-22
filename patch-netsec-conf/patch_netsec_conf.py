@@ -131,6 +131,26 @@ def find_netsec_path(apk_path, xml_path=None):
     )
 
 
+def _clone_zip_info(zi):
+    """Create a fresh ZipInfo for repacking, dropping stale alignment padding.
+
+    Reusing the source ZipInfo's `extra` field verbatim carries over zipalign's
+    offset-dependent padding, which no longer matches the new archive layout
+    once entry sizes shift -- silently de-aligning the output APK.
+    """
+    new_info = zipfile.ZipInfo(zi.filename, zi.date_time)
+    new_info.compress_type = zi.compress_type
+    new_info.comment = zi.comment
+    new_info.create_system = zi.create_system
+    new_info.create_version = zi.create_version
+    new_info.extract_version = zi.extract_version
+    new_info.flag_bits = zi.flag_bits
+    new_info.external_attr = zi.external_attr
+    new_info.internal_attr = zi.internal_attr
+    new_info.volume = zi.volume
+    return new_info
+
+
 def patch_apk(apk_path, xml_path=None):
     apk_path = Path(apk_path)
 
@@ -158,7 +178,7 @@ def patch_apk(apk_path, xml_path=None):
                         data = pick_replacement_bytes(orig_data)
                         replaced = True
 
-                    zout.writestr(item, data)
+                    zout.writestr(_clone_zip_info(item), data)
 
                 if not replaced:
                     raise RuntimeError("Target XML file not found in APK")
