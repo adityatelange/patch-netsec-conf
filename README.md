@@ -40,7 +40,7 @@ This is useful when you need to intercept an app's network traffic for analysis 
    > Any APK modification invalidates the original signature. You must re-sign before installing.
    > I recommend using [APK Explorer & Editor (AEE)](https://github.com/apk-editor/APK-Explorer-Editor) for this step, as it also handles re-aligning and re-signing in one flow.
 
-   > If you sign manually with `apksigner`, run `zipalign` on the patched APK first (`apksigner` does not align for you). The replaced XML entry changes size, so the original `zipalign` padding no longer lines up with the new archive layout.
+   > The patched APK is already zipaligned (4-byte for uncompressed entries, 16 KB for uncompressed native libraries) and has the stale v1 signature files removed, so you can sign it directly, e.g. with `apksigner`. Do not run `zipalign` after signing, as it invalidates v2+ signatures.
 
 ## How it works
 

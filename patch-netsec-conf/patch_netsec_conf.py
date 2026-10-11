@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import shutil
+import struct
 import sys
 import tempfile
 import zipfile
@@ -26,6 +27,16 @@ PLAINTEXT_NETSEC_FILENAME = "network_security_config_plain.xml"
 # Reference (file(1) magic rule for Android binary XML):
 # https://github.com/file/file/blob/44cfb238c42f6ccaa9440c523dccdc7b72179911/magic/Magdir/android#L179-L185
 AXML_FILE_MAGIC_BYTES = b"\x03\x00\x08\x00"
+# ZIP local file header size, excluding filename and extra field.
+ZIP_LOCAL_HEADER_SIZE = 30
+# Extra field ID used by apksigner/zipflinger for alignment padding.
+ANDROID_ALIGNMENT_EXTRA_ID = 0xD935
+# zipalign alignment for uncompressed entries (required for resources.arsc on R+).
+STORED_ENTRY_ALIGNMENT = 4
+# Page alignment for uncompressed native libs (16 KB also satisfies 4 KB pages).
+NATIVE_LIB_ALIGNMENT = 16384
+# v1 (JAR) signature files that become stale once any entry changes.
+SIGNATURE_FILE_SUFFIXES = (".SF", ".RSA", ".DSA", ".EC")
 
 
 def _load_bundled_bytes(filename):
@@ -136,7 +147,7 @@ def _clone_zip_info(zi):
 
     Reusing the source ZipInfo's `extra` field verbatim carries over zipalign's
     offset-dependent padding, which no longer matches the new archive layout
-    once entry sizes shift -- silently de-aligning the output APK.
+    once entry sizes shift. Alignment is recomputed in `patch_apk` instead.
     """
     new_info = zipfile.ZipInfo(zi.filename, zi.date_time)
     new_info.compress_type = zi.compress_type
@@ -149,6 +160,43 @@ def _clone_zip_info(zi):
     new_info.internal_attr = zi.internal_attr
     new_info.volume = zi.volume
     return new_info
+
+
+def _alignment_extra(header_offset, info):
+    """Build a local-header extra field that aligns a stored entry's data.
+
+    Mirrors `zipalign -P 16 4`: uncompressed entries start on a 4-byte boundary
+    and uncompressed native libs on a 16 KB page boundary. Without this, Android
+    rejects APKs with extractNativeLibs=false or targetSdk >= 30.
+    """
+    if info.compress_type != zipfile.ZIP_STORED:
+        return b""
+
+    if info.filename.endswith(".so"):
+        alignment = NATIVE_LIB_ALIGNMENT
+    else:
+        alignment = STORED_ENTRY_ALIGNMENT
+
+    try:
+        name_len = len(info.filename.encode("ascii"))
+    except UnicodeEncodeError:
+        name_len = len(info.filename.encode("utf-8"))
+
+    # 6 bytes: extra ID, extra size, alignment value.
+    data_start = header_offset + ZIP_LOCAL_HEADER_SIZE + name_len + 6
+    pad = -data_start % alignment
+    return struct.pack(
+        "<HHH", ANDROID_ALIGNMENT_EXTRA_ID, 2 + pad, alignment
+    ) + (b"\0" * pad)
+
+
+def _is_signature_file(name):
+    """Check whether an entry is part of the original v1 (JAR) signature."""
+    if not name.startswith("META-INF/") or "/" in name[len("META-INF/") :]:
+        return False
+
+    upper = name.upper()
+    return upper == "META-INF/MANIFEST.MF" or upper.endswith(SIGNATURE_FILE_SUFFIXES)
 
 
 def patch_apk(apk_path, xml_path=None):
@@ -168,8 +216,13 @@ def patch_apk(apk_path, xml_path=None):
             with zipfile.ZipFile(temp_apk, "w") as zout:
 
                 replaced = False
+                stripped_signature = False
 
                 for item in zin.infolist():
+                    if _is_signature_file(item.filename):
+                        stripped_signature = True
+                        continue
+
                     orig_data = zin.read(item.filename)
                     data = orig_data
 
@@ -178,10 +231,18 @@ def patch_apk(apk_path, xml_path=None):
                         data = pick_replacement_bytes(orig_data)
                         replaced = True
 
-                    zout.writestr(_clone_zip_info(item), data)
+                    new_info = _clone_zip_info(item)
+                    new_info.extra = _alignment_extra(zout.fp.tell(), new_info)
+                    zout.writestr(new_info, data)
+                    # Padding only matters in the local header; keep it out of
+                    # the central directory written at close().
+                    new_info.extra = b""
 
                 if not replaced:
                     raise RuntimeError("Target XML file not found in APK")
+
+                if stripped_signature:
+                    print("[+] Removed stale v1 signature files from META-INF/")
 
         shutil.move(temp_apk, output_apk)
 
